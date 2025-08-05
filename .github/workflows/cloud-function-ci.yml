@@ -1,12 +1,23 @@
+# TEMPLATE WORKFLOW - Automatic triggers disabled
+# To enable this workflow in your project:
+# 1. Uncomment the triggers under 'on:' section
+# 2. Ensure you have a cloud_comm_pubsub/ directory with your Cloud Function code
+# 3. Customize the validation steps for your specific function requirements
+
 name: Cloud Function CI
 
+permissions:
+  contents: read
+
 on:
-  push:
-    paths:
-      - 'cloud_comm_pubsub/**'
-  pull_request:
-    paths:
-      - 'cloud_comm_pubsub/**'
+  # Automatic triggers disabled for template project
+  # push:
+  #   paths:
+  #     - 'cloud_comm_pubsub/**'
+  # pull_request:
+  #   paths:
+  #     - 'cloud_comm_pubsub/**'
+  workflow_dispatch:
 
 jobs:
   cloud-function-validation:
@@ -16,10 +27,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Check if cloud function directory exists
+      run: |
+        if [ ! -d "cloud_comm_pubsub" ]; then
+          echo "❌ cloud_comm_pubsub/ directory not found. This appears to be a template project."
+          echo "To use this workflow, create a cloud_comm_pubsub/ directory with your Cloud Function code."
+          exit 0
+        fi
+
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: 3.13
 
     - name: Validate Python syntax
       working-directory: ./cloud_comm_pubsub

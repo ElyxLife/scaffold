@@ -1,10 +1,20 @@
+# TEMPLATE WORKFLOW - Automatic triggers disabled
+# To enable this workflow in your project:
+# 1. Uncomment the triggers under 'on:' section
+# 2. Ensure you have the required directories: terraform/, backend/, ui/
+# 3. Customize the validation steps for your specific project needs
+
 name: Validate Code Quality
 
+permissions:
+  contents: read
+
 on:
-  pull_request:
-    branches: [ main, develop ]
-  push:
-    branches: [ main ]
+  # Automatic triggers disabled for template project
+  # pull_request:
+  #   branches: [ main, develop ]
+  # push:
+  #   branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -15,6 +25,14 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Check if terraform directory exists
+      run: |
+        if [ ! -d "terraform" ]; then
+          echo "❌ terraform/ directory not found. This appears to be a template project."
+          echo "To use this workflow, create a terraform/ directory with your infrastructure code."
+          exit 0
+        fi
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3
@@ -64,7 +82,7 @@ jobs:
       with:
         severity: warning
         check_together: yes
-        scandir: '.'
+        scandir: .
         format: gcc
 
   python-tests:
@@ -75,10 +93,18 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Check if backend directory exists
+      run: |
+        if [ ! -d "backend" ]; then
+          echo "❌ backend/ directory not found. This appears to be a template project."
+          echo "To use this workflow, create a backend/ directory with your Python code."
+          exit 0
+        fi
+
     - name: Install uv
       uses: astral-sh/setup-uv@v5
       with:
-        version: "latest"
+        version: latest
 
     - name: Set up Python
       run: uv python install 3.13
@@ -106,12 +132,20 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Check if ui directory exists
+      run: |
+        if [ ! -d "ui" ]; then
+          echo "❌ ui/ directory not found. This appears to be a template project."
+          echo "To use this workflow, create a ui/ directory with your frontend code."
+          exit 0
+        fi
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: 'ui/package-lock.json'
+        node-version: 18
+        cache: npm
+        cache-dependency-path: ui/package-lock.json
 
     - name: Install dependencies
       run: |

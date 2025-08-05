@@ -1,9 +1,17 @@
+# TEMPLATE WORKFLOW - Automatic triggers disabled
+# To enable this workflow in your project:
+# 1. Uncomment the triggers under 'on:' section
+# 2. Ensure you have the relevant directories: backend/, ui/, terraform/
+# 3. Configure proper linting and formatting tools for your project
+
 name: autofix.ci
 
 on:
-  pull_request:
-  push:
-    branches: [ "main" ]
+  # Automatic triggers disabled for template project
+  # pull_request:
+  # push:
+  #   branches: [ "main" ]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,11 +22,19 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
+    - name: Check if project directories exist
+      run: |
+        if [ ! -d "backend" ] && [ ! -d "ui" ] && [ ! -d "terraform" ]; then
+          echo "❌ No backend/, ui/, or terraform/ directories found. This appears to be a template project."
+          echo "To use this workflow, create the relevant directories with your code."
+          exit 0
+        fi
+
     # Backend: Python/Ruff formatting
     - name: Set up Python
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
+        python-version: 3.13
 
     - name: Install uv
       uses: astral-sh/setup-uv@v3
@@ -39,9 +55,9 @@ jobs:
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: 'ui/package-lock.json'
+        node-version: 18
+        cache: npm
+        cache-dependency-path: ui/package-lock.json
 
     - name: Install frontend dependencies
       working-directory: ./ui

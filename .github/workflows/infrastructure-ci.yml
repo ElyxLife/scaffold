@@ -1,12 +1,23 @@
+# TEMPLATE WORKFLOW - Automatic triggers disabled
+# To enable this workflow in your project:
+# 1. Uncomment the triggers under 'on:' section
+# 2. Ensure you have a terraform/ directory with your infrastructure code
+# 3. Configure proper backend and variable files for your Terraform setup
+
 name: Infrastructure CI
 
+permissions:
+  contents: read
+
 on:
-  push:
-    paths:
-      - 'terraform/**'
-  pull_request:
-    paths:
-      - 'terraform/**'
+  # Automatic triggers disabled for template project
+  # push:
+  #   paths:
+  #     - 'terraform/**'
+  # pull_request:
+  #   paths:
+  #     - 'terraform/**'
+  workflow_dispatch:
 
 jobs:
   terraform-validation:
@@ -15,6 +26,14 @@ jobs:
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+
+    - name: Check if terraform directory exists
+      run: |
+        if [ ! -d "terraform" ]; then
+          echo "❌ terraform/ directory not found. This appears to be a template project."
+          echo "To use this workflow, create a terraform/ directory with your infrastructure code."
+          exit 0
+        fi
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v3

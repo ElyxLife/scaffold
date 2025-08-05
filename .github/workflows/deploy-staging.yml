@@ -1,9 +1,23 @@
+# TEMPLATE WORKFLOW - Automatic triggers disabled
+# ⚠️  IMPORTANT: This is a DEPLOYMENT workflow
+# To enable this workflow in your project:
+# 1. Uncomment the trigger under 'on:' section
+# 2. Configure your GCP project IDs and service accounts
+# 3. Set up Workload Identity Federation for authentication
+# 4. Ensure you have proper terraform configs and deployment scripts
+
 name: Deploy to Staging
 
+permissions:
+  contents: read
+  id-token: write
+
 on:
-  push:
-    branches:
-      - main
+  # Automatic triggers disabled for template project
+  # push:
+  #   branches:
+  #     - main
+  workflow_dispatch:
 
 jobs:
   detect-changes:
@@ -17,8 +31,16 @@ jobs:
     - uses: actions/checkout@v4
       with:
         fetch-depth: 2
+
+    - name: Check if deployment directories exist
+      run: |
+        if [ ! -d "terraform" ] || [ ! -d "terraform/scripts" ]; then
+          echo "❌ Required terraform/ and terraform/scripts/ directories not found. This appears to be a template project."
+          echo "To use this workflow, set up your terraform configuration and deployment scripts."
+          exit 0
+        fi
     
-    - uses: dorny/paths-filter@v2
+    - uses: dorny/paths-filter@v3
       id: changes
       with:
         filters: |
@@ -94,9 +116,9 @@ jobs:
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: 'ui/package-lock.json'
+        node-version: 18
+        cache: npm
+        cache-dependency-path: ui/package-lock.json
 
     - name: Setup gcloud CLI
       uses: google-github-actions/setup-gcloud@v2

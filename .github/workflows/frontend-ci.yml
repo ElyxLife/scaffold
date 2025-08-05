@@ -1,12 +1,23 @@
+# TEMPLATE WORKFLOW - Automatic triggers disabled
+# To enable this workflow in your project:
+# 1. Uncomment the triggers under 'on:' section
+# 2. Ensure you have a ui/ directory with your frontend code
+# 3. Configure npm scripts (test, lint, build) in your package.json
+
 name: Frontend CI
 
+permissions:
+  contents: read
+
 on:
-  push:
-    paths:
-      - 'ui/**'
-  pull_request:
-    paths:
-      - 'ui/**'
+  # Automatic triggers disabled for template project
+  # push:
+  #   paths:
+  #     - 'ui/**'
+  # pull_request:
+  #   paths:
+  #     - 'ui/**'
+  workflow_dispatch:
 
 jobs:
   frontend-validation:
@@ -16,12 +27,20 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
 
+    - name: Check if ui directory exists
+      run: |
+        if [ ! -d "ui" ]; then
+          echo "❌ ui/ directory not found. This appears to be a template project."
+          echo "To use this workflow, create a ui/ directory with your frontend code."
+          exit 0
+        fi
+
     - name: Set up Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
-        cache: 'npm'
-        cache-dependency-path: 'ui/package-lock.json'
+        node-version: 18
+        cache: npm
+        cache-dependency-path: ui/package-lock.json
 
     - name: Install dependencies
       working-directory: ./ui
@@ -39,4 +58,4 @@ jobs:
       working-directory: ./ui
       run: npm run build
       env:
-        VITE_API_BASE_URL: 'https://example.com/api'  # Test build with dummy URL
+        VITE_API_BASE_URL: https://example.com/api  # Test build with dummy URL
