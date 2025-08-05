@@ -1,0 +1,14 @@
+---
+alwaysApply: true
+---
+When I ask for help with cloud architecture, DO NOT tell me how to use the cloud provider's UI. Make changes to the terraform files and apply them. If that's not possible, give me cli commands I can run.
+--
+
+Practice Test Driven Development. Before you write code, write a test to make sure it works. And then after you write the code, test it to make sure the tests pass. If the tests fail, DO NOT change the test to fit the code. 
+Instead, 
+1. review the test independently to make sure it's correct, 
+2. Fix the tests if necessary, 
+3. If the tests are still failing, Fix the code to make the tests pass.
+
+--
+If you need to use an external API, use context7 to establish the correct API endpoints before implementing it. This is even more important for hard-to-find errors like error codes or specific behaviour.

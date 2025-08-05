@@ -1,0 +1,47 @@
+name: Infrastructure CI
+
+on:
+  push:
+    paths:
+      - 'terraform/**'
+  pull_request:
+    paths:
+      - 'terraform/**'
+
+jobs:
+  terraform-validation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: latest
+
+    - name: Terraform Format Check
+      working-directory: ./terraform
+      run: terraform fmt -check -recursive
+
+    - name: Terraform Init (CI validation only)
+      working-directory: ./terraform
+      run: |
+        # Temporarily remove backend config for CI validation
+        mv backend.tf backend.tf.bak
+        terraform init
+        # Restore backend config
+        mv backend.tf.bak backend.tf
+
+    - name: Terraform Validate
+      working-directory: ./terraform
+      run: terraform validate
+
+    - name: Terraform Plan (Dry Run)
+      working-directory: ./terraform
+      run: |
+        # Use existing example files for validation
+        terraform plan -var-file=terraform.tfvars.example -var-file=terraform.auto.tfvars.secrets.example -out=plan.tfplan || true
+        
+        echo "Terraform validation completed"

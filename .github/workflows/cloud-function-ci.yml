@@ -1,0 +1,56 @@
+name: Cloud Function CI
+
+on:
+  push:
+    paths:
+      - 'cloud_comm_pubsub/**'
+  pull_request:
+    paths:
+      - 'cloud_comm_pubsub/**'
+
+jobs:
+  cloud-function-validation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+
+    - name: Validate Python syntax
+      working-directory: ./cloud_comm_pubsub
+      run: |
+        python -m py_compile main.py
+        echo "Python syntax validation successful"
+
+    - name: Check requirements.txt
+      working-directory: ./cloud_comm_pubsub
+      run: |
+        if [ -f requirements.txt ]; then
+          pip install --dry-run -r requirements.txt
+          echo "Requirements validation successful"
+        else
+          echo "No requirements.txt found"
+        fi
+
+    - name: Validate Cloud Function structure
+      working-directory: ./cloud_comm_pubsub
+      run: |
+        # Check for main.py file
+        if [ ! -f "main.py" ]; then
+          echo "Error: main.py not found"
+          exit 1
+        fi
+        
+        # Check for basic function structure (assuming entry point function exists)
+        if grep -q "def " main.py; then
+          echo "Function definitions found in main.py"
+        else
+          echo "Warning: No function definitions found in main.py"
+        fi
+        
+        echo "Cloud Function structure validation completed"

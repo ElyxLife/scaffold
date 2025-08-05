@@ -1,0 +1,8 @@
+---
+description:
+globs:
+alwaysApply: true
+---
+Ask the AI to write unit tests and dont deploy until the code coverage is > 60% for all files that contain business logic. 
+Avoid mocks while testing - instead choose to refactor code.
+

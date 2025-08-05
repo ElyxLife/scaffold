@@ -1,0 +1,195 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      backend-changed: ${{ steps.changes.outputs.backend }}
+      frontend-changed: ${{ steps.changes.outputs.frontend }}
+      cloud-function-changed: ${{ steps.changes.outputs.cloud-function }}
+      terraform-changed: ${{ steps.changes.outputs.terraform }}
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 2
+    
+    - uses: dorny/paths-filter@v2
+      id: changes
+      with:
+        filters: |
+          backend:
+            - 'backend/**'
+          frontend:
+            - 'ui/**'
+          cloud-function:
+            - 'cloud_comm_pubsub/**'
+          terraform:
+            - 'terraform/**/*.tf'
+            - 'terraform/**/*.tfvars'
+            - 'terraform/**/*.tfvars.example'
+            - '!terraform/scripts/**'
+
+  deploy-backend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.backend-changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup gcloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Extract project ID and number from Terraform config
+      id: project
+      run: |
+        PROJECT_ID=$(grep '^project_id' terraform/terraform.tfvars.staging | cut -d'"' -f2)
+        echo "project_id=$PROJECT_ID" >> $GITHUB_OUTPUT
+        PROJECT_NUMBER=$(grep '^project_number' terraform/terraform.tfvars.staging | cut -d'"' -f2)
+        echo "project_number=$PROJECT_NUMBER" >> $GITHUB_OUTPUT
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        project_id: ${{ steps.project.outputs.project_id }}
+        workload_identity_provider: projects/${{ steps.project.outputs.project_number }}/locations/global/workloadIdentityPools/github-actions-staging-v2/providers/github-provider
+        service_account: github-actions-staging@${{ steps.project.outputs.project_id }}.iam.gserviceaccount.com
+
+    - name: Configure Docker for GCP
+      run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Generate version tag
+      id: version
+      run: |
+        VERSION_TAG="$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)"
+        echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
+
+    - name: Deploy backend
+      run: ./terraform/scripts/deploy-backend.sh staging ${{ steps.version.outputs.version_tag }} ${{ steps.project.outputs.project_id }}
+
+  deploy-frontend:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.frontend-changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'ui/package-lock.json'
+
+    - name: Setup gcloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Extract project ID and number from Terraform config
+      id: project
+      run: |
+        PROJECT_ID=$(grep '^project_id' terraform/terraform.tfvars.staging | cut -d'"' -f2)
+        echo "project_id=$PROJECT_ID" >> $GITHUB_OUTPUT
+        PROJECT_NUMBER=$(grep '^project_number' terraform/terraform.tfvars.staging | cut -d'"' -f2)
+        echo "project_number=$PROJECT_NUMBER" >> $GITHUB_OUTPUT
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        project_id: ${{ steps.project.outputs.project_id }}
+        workload_identity_provider: projects/${{ steps.project.outputs.project_number }}/locations/global/workloadIdentityPools/github-actions-staging-v2/providers/github-provider
+        service_account: github-actions-staging@${{ steps.project.outputs.project_id }}.iam.gserviceaccount.com
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Deploy frontend
+      run: ./terraform/scripts/deploy-frontend.sh staging
+
+  deploy-cloud-function:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.cloud-function-changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup gcloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Extract project ID and number from Terraform config
+      id: project
+      run: |
+        PROJECT_ID=$(grep '^project_id' terraform/terraform.tfvars.staging | cut -d'"' -f2)
+        echo "project_id=$PROJECT_ID" >> $GITHUB_OUTPUT
+        PROJECT_NUMBER=$(grep '^project_number' terraform/terraform.tfvars.staging | cut -d'"' -f2)
+        echo "project_number=$PROJECT_NUMBER" >> $GITHUB_OUTPUT
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        project_id: ${{ steps.project.outputs.project_id }}
+        workload_identity_provider: projects/${{ steps.project.outputs.project_number }}/locations/global/workloadIdentityPools/github-actions-staging-v2/providers/github-provider
+        service_account: github-actions-staging@${{ steps.project.outputs.project_id }}.iam.gserviceaccount.com
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Deploy cloud function
+      run: ./terraform/scripts/deploy-cloud-function.sh staging
+
+  deploy-infrastructure:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.terraform-changed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup gcloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Extract project ID from Terraform config
+      id: project
+      run: |
+        PROJECT_ID=$(grep '^project_id' terraform/terraform.tfvars.staging | cut -d'"' -f2)
+        echo "project_id=$PROJECT_ID" >> $GITHUB_OUTPUT
+        PROJECT_NUMBER=$(grep '^project_number' terraform/terraform.tfvars.staging | cut -d'"' -f2)
+        echo "project_number=$PROJECT_NUMBER" >> $GITHUB_OUTPUT
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        project_id: ${{ steps.project.outputs.project_id }}
+        workload_identity_provider: projects/${{ steps.project.outputs.project_number }}/locations/global/workloadIdentityPools/github-actions-staging-v2/providers/github-provider
+        service_account: github-actions-staging@${{ steps.project.outputs.project_id }}.iam.gserviceaccount.com
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Deploy infrastructure
+      run: ./terraform/scripts/deploy-infrastructure.sh staging

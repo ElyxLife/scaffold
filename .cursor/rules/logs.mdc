@@ -1,0 +1,81 @@
+---
+description: guidelines for structured logging so that all logs are immediately queryable in Google Cloud Logging
+alwaysApply: true
+---
+
+We want every log line produced by our applications (backend, Terraform provisioning scripts, Cloud Functions, UI, etc.) to be immediately usable in Google Cloud Logging (formerly Stackdriver) without any post-processing.
+
+Core principles
+- Emit JSON-structured logs, **not** plain strings. Google Cloud automatically parses top-level JSON keys.
+- Each log entry must be a *single* line of UTF-8 JSON (no embedded newlines).
+- Never embed JSON inside the `message` field – put your structured data in sibling keys.
+- Avoid logging secrets, passwords, tokens, or end-user personal data.
+
+Recommended top-level fields
+| field      | type   | purpose                                                                                                                             |
+| ---------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------- |
+| `severity` | string | One of DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL, ALERT, EMERGENCY. Choose the lowest level that accurately reflects the event. |
+| `message`  | string | Human-readable sentence that summarises the event.                                                                                  |
+| `service`  | string | Short name of the service/component emitting the log (`backend`, `cloud-function`, `ui`, etc.).                                     |
+| `context`  | object | Arbitrary key/values that make the event explorable (`user_id`, `group_id`, `gcp_project`, etc.).                                   |
+| `trace`    | string | Full Cloud Trace ID (`projects/<PROJECT_ID>/traces/<TRACE_ID>`). Include whenever handling a request so logs are correlated.        |
+| `spanId`   | string | Optional span id (hex) if you have finer-grained spans.                                                                             |
+| `labels`   | object | Extra dimensions you want to facet on in the Logs Explorer.                                                                         |
+| `stack`    | string | Full stack trace when logging an exception. Use `logging.exception` / `console.error(err)` so this is filled automatically.         |
+
+Message field guidelines
+- The `message` should be a concise, human-readable summary visible at a glance in the Logs Explorer list view.
+- Aim for ≤ 80 characters so it doesn’t get truncated in common log viewers.
+- Use **verb-first, past-tense** phrasing for completed events (`"user login succeeded"`, `"invoice created"`).
+- Include the **action** and the **domain object**. Add a **short, non-sensitive identifier** (name or ID) *when it makes the entry self-explanatory*; put bulky or sensitive data in `context`.
+    - Good: `"listed folder 07-fitness-reports/2025"` with `context={"folder_path":"07. Fitness & Tracking Reports/2025"}`.
+    - Good: `"sent WhatsApp message"` with `context={"chat_id":123}` (identifier not critical).
+    - Bad:  `"folder listing"` (too vague), `"event processed"`, or embedding JSON inside `message`.
+- For failures, prefix with the failure verb (`"failed to …"`, `"cannot …"`) so production issues pop out visually (`severity=ERROR`, message starts with `failed`).
+- Keep style consistent across services—use lowercase, no trailing punctuation, and avoid internal codes (`"ERR123"`).
+- Never include secrets, PII, or stack traces (those belong in `stack`).
+
+Language-specific guidance
+Python
+- Use `google.cloud.logging` or `structlog` with a JSON renderer.
+- Configure the root logger in `config.py`:
+    ```python
+    import logging, os
+    from pythonjsonlogger import jsonlogger
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(jsonlogger.JsonFormatter())
+
+    root = logging.getLogger()
+    root.setLevel(os.getenv("LOG_LEVEL", "INFO"))
+    root.addHandler(handler)
+    ```
+- Pass extra structured fields via `logger.info("user_login", extra={"user_id": uid})`.
+
+TypeScript / Node
+- Use `pino` (preferred) or `winston` with a Cloud Logging transport.
+- Example:
+    ```ts
+    import pino from 'pino';
+    export const logger = pino({ level: process.env.LOG_LEVEL ?? 'info' });
+    logger.info({ user_id, route: '/login' }, 'user_login');
+    ```
+
+Shell / Terraform
+- Wrap echo calls with `jq -nc --arg msg "$MSG" '{message: $msg, severity: "INFO", service: "terraform"}'` to emit valid JSON.
+
+Correlation
+- Propagate the incoming `X-Cloud-Trace-Context` header through your services.
+- When starting a new trace, generate a random 32-character hex trace id and put it in the same header. Cloud Logging will link related entries automatically.
+
+Retention & volume
+- Use DEBUG locally, but default to INFO in production.
+- Avoid high-volume DEBUG/INFO logs inside tight loops; prefer sampling or aggregated counters.
+
+Testing
+- Unit tests should assert on the structured fields instead of string matching the raw JSON.
+
+Sample entry
+```json
+{"severity":"INFO","message":"concierge assigned","service":"backend","context":{"user_id":42,"group_id":"PANAMA"},"trace":"projects/synapse/traces/34fab0...","labels":{"env":"staging"}}
+```

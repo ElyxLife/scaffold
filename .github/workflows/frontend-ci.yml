@@ -1,0 +1,42 @@
+name: Frontend CI
+
+on:
+  push:
+    paths:
+      - 'ui/**'
+  pull_request:
+    paths:
+      - 'ui/**'
+
+jobs:
+  frontend-validation:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'ui/package-lock.json'
+
+    - name: Install dependencies
+      working-directory: ./ui
+      run: npm ci
+
+    - name: Run tests
+      working-directory: ./ui
+      run: npm run test
+
+    - name: Run linting
+      working-directory: ./ui
+      run: npm run lint
+
+    - name: Build frontend
+      working-directory: ./ui
+      run: npm run build
+      env:
+        VITE_API_BASE_URL: 'https://example.com/api'  # Test build with dummy URL

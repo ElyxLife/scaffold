@@ -1,0 +1,9 @@
+---
+description: working on cloud infrastructure
+alwaysApply: false
+---
+- Always use terraform when creating infrastructure. DO NOT use adhoc scripts.
+- Create a folder called terraform/ with all the terraform files.
+- Deployment is done by running terraform/deploy.sh. It uses cli to set up permissions. Only include things in deploy.sh that cannot be done using terraform.
+- Set up terraform assuming it will be used in multiple environments (eg. atleast staging and prod).
+- Use the terraform console to extract variables from the tfvars file.

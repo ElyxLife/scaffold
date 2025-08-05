@@ -1,0 +1,115 @@
+name: Deploy to Production
+
+on:
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: 'Version tag for deployment (e.g., v1.0.1, latest, or leave empty for auto-generated)'
+        required: false
+        default: ''
+      deployment_type:
+        description: 'Type of deployment'
+        required: true
+        default: 'full'
+        type: choice
+        options:
+        - full
+        - backend-only
+        - frontend-only
+        - cloud-function-only
+        - infrastructure-only
+
+jobs:
+  approve-deployment:
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+    - name: Deployment approval
+      run: |
+        echo "Production deployment approved"
+        echo "Version tag: ${{ github.event.inputs.version_tag }}"
+        echo "Deployment type: ${{ github.event.inputs.deployment_type }}"
+
+  deploy-production:
+    needs: approve-deployment
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Extract project ID from Terraform config
+      id: project
+      run: |
+        PROJECT_ID=$(grep '^project_id' terraform/terraform.tfvars.prod | cut -d'"' -f2)
+        echo "project_id=$PROJECT_ID" >> $GITHUB_OUTPUT
+        # TODO: Replace with actual project number after running setup-workload-identity.sh
+        echo "project_number=YOUR_PROD_PROJECT_NUMBER" >> $GITHUB_OUTPUT
+
+    - name: Authenticate to Google Cloud
+      uses: google-github-actions/auth@v2
+      with:
+        project_id: ${{ steps.project.outputs.project_id }}
+        workload_identity_provider: projects/${{ steps.project.outputs.project_number }}/locations/global/workloadIdentityPools/github-actions-production/providers/github-provider
+        service_account: github-actions-production@${{ steps.project.outputs.project_id }}.iam.gserviceaccount.com
+
+    - name: Setup gcloud CLI
+      uses: google-github-actions/setup-gcloud@v2
+
+    - name: Configure Docker for GCP (if deploying backend)
+      if: github.event.inputs.deployment_type == 'backend-only' || github.event.inputs.deployment_type == 'full'
+      run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev
+
+    - name: Setup Node.js (if deploying frontend)
+      if: github.event.inputs.deployment_type == 'frontend-only' || github.event.inputs.deployment_type == 'full'
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'ui/package-lock.json'
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+
+    - name: Generate version tag
+      id: version
+      run: |
+        if [ -n "${{ github.event.inputs.version_tag }}" ]; then
+          VERSION_TAG="${{ github.event.inputs.version_tag }}"
+        else
+          VERSION_TAG="$(date +%Y%m%d-%H%M%S)-$(git rev-parse --short HEAD)"
+        fi
+        echo "version_tag=$VERSION_TAG" >> $GITHUB_OUTPUT
+        echo "Using version tag: $VERSION_TAG"
+
+    - name: Deploy full stack
+      if: github.event.inputs.deployment_type == 'full'
+      run: ./terraform/deploy.sh prod ${{ steps.version.outputs.version_tag }}
+
+    - name: Deploy backend only
+      if: github.event.inputs.deployment_type == 'backend-only'
+      run: ./terraform/scripts/deploy-backend.sh prod ${{ steps.version.outputs.version_tag }} ${{ steps.project.outputs.project_id }}
+
+    - name: Deploy frontend only
+      if: github.event.inputs.deployment_type == 'frontend-only'
+      run: ./terraform/scripts/deploy-frontend.sh prod
+
+    - name: Deploy cloud function only
+      if: github.event.inputs.deployment_type == 'cloud-function-only'
+      run: ./terraform/scripts/deploy-cloud-function.sh prod
+
+    - name: Deploy infrastructure only
+      if: github.event.inputs.deployment_type == 'infrastructure-only'
+      run: ./terraform/scripts/deploy-infrastructure.sh prod
+
+    - name: Post-deployment summary
+      run: |
+        echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+        echo "- **Environment**: Production" >> $GITHUB_STEP_SUMMARY
+        echo "- **Version Tag**: ${{ steps.version.outputs.version_tag }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Deployment Type**: ${{ github.event.inputs.deployment_type }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Triggered By**: ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
+        echo "- **Commit SHA**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY

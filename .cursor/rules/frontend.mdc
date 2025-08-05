@@ -1,0 +1,16 @@
+---
+description: when working on front end code
+alwaysApply: false
+---
+
+- Prefer react + tailwind + shadcn over any other framework.
+- If the existing code is not using react, use the existing code as a reference to write new code.
+
+When dealing with React hooks dependencies:
+- NEVER immediately reach for eslint-disable comments
+- ALWAYS understand why a dependency is flagged
+- If a dependency should trigger re-runs: include it
+- If it shouldn't: restructure the code so it's not needed inside the effect
+- Use useMemo/useCallback for stable references to complex expressions
+- Work WITH React's dependency system, not against it
+- Prefer clear, simple code over clever optimizations

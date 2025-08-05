@@ -1,0 +1,65 @@
+name: autofix.ci
+
+on:
+  pull_request:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    # Backend: Python/Ruff formatting
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+
+    - name: Install backend dependencies
+      working-directory: ./backend
+      run: uv sync
+
+    - name: Fix backend linting issues
+      working-directory: ./backend
+      run: uv run ruff check --fix .
+
+    - name: Format backend code
+      working-directory: ./backend
+      run: uv run ruff format .
+
+    # Frontend: ESLint/Prettier formatting
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: 'ui/package-lock.json'
+
+    - name: Install frontend dependencies
+      working-directory: ./ui
+      run: npm ci
+
+    - name: Fix frontend linting issues
+      working-directory: ./ui
+      run: npm run lint --fix || true
+
+    # Infrastructure: Terraform formatting
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: latest
+
+    - name: Format Terraform files
+      working-directory: ./terraform
+      run: terraform fmt -recursive
+
+    # Apply all fixes via autofix.ci
+    - uses: autofix-ci/action@ff86a557419858bb967097bfc916833f5647fa8c

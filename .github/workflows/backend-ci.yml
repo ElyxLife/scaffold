@@ -1,0 +1,61 @@
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - 'backend/**'
+  pull_request:
+    paths:
+      - 'backend/**'
+
+jobs:
+  backend-validation:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.13'
+
+    - name: Install uv
+      uses: astral-sh/setup-uv@v3
+
+    - name: Cache uv dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/uv
+        key: ${{ runner.os }}-uv-${{ hashFiles('backend/pyproject.toml') }}
+        restore-keys: |
+          ${{ runner.os }}-uv-
+
+    - name: Install dependencies
+      working-directory: ./backend
+      run: uv sync
+
+    - name: Run tests with coverage
+      working-directory: ./backend
+      run: uv run pytest --cov=backend --cov-report=term --cov-fail-under=40
+
+    - name: Run linting with ruff
+      working-directory: ./backend
+      run: uv run ruff check .
+
+    - name: Run type checking with mypy
+      working-directory: ./backend
+      run: uv run mypy .
+
+    - name: Check Ruff formatting
+      working-directory: ./backend
+      run: uv run ruff format --check .
+
+    - name: Test Docker build (no push)
+      run: |
+        docker build -f backend/Dockerfile -t whatsapp-backend:test .
+        echo "Docker build successful"
