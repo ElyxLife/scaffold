@@ -3,12 +3,16 @@ description: when working on Python backend code (FastAPI, pydantic, database)
 globs:
 alwaysApply: false
 ---
-Use python (with pydantic and fastapi) or typescript for backend code, unless there is a very good reason to use something else.
+Prefer typescript over python.
 
+
+Check with the user before using other languages, and document the reason for doing so.
+
+
+--
+### Python Backend
+- Use uv to manage python packages.
+- Use pydantic to write backend code. If you need an API, use fastapi.
 - When you use a python package, explicitly use the following command to find the LATEST version of the package and use it, unless specifically asked not do so.
 
 `pip index versions <package>`
-
---
-- Use uv to manage python packages.
-- Use pydantic to write backend code. If you need an API, use fastapi.
