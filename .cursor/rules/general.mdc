@@ -12,3 +12,5 @@ Instead,
 
 --
 If you need to use an external API, use context7 to establish the correct API endpoints before implementing it. This is even more important for hard-to-find errors like error codes or specific behaviour.
+--
+The default region for all deployments is asia-southeast1.
